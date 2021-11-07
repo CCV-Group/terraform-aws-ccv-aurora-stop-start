@@ -1,28 +1,9 @@
-resource "aws_security_group" "rds_lambda" {
-  name        = "rds_lambda_sg"
-  description = "RDS Lambda Security Group"
-  vpc_id      = var.vpc_id
-}
-
-resource "aws_security_group_rule" "rds_lambda_egress_443" {
-  type              = "egress"
-  from_port         = 443
-  to_port           = 443
-  protocol          = "tcp"
-  description       = "Allow Egress traffic over port 443 to each AWS API."
-  cidr_blocks       = ["0.0.0.0/0"] #tfsec:ignore:AWS007
-  security_group_id = aws_security_group.rds_lambda.id
-}
-
 data "archive_file" "lambda_stop_aurora" {
   type        = "zip"
   source_file = "${path.module}/lambda/stop_aurora.py"
   output_path = "${path.module}/lambda/stop_aurora.zip"
 }
 
-/*
-Stop Aurora at 18:30, daily
-*/
 module "lambda_stop_aurora" {
   source        = "github.com/schubergphilis/terraform-aws-mcaf-lambda?ref=v0.1.25"
   name          = "lambda_stop_aurora"
@@ -42,13 +23,10 @@ module "lambda_stop_aurora" {
 
   environment = {
     "REGION" = "${var.region}"
-    "KEY"    = "${var.rds_tag_name}"
-    "VALUE"  = "${var.rds_tag_value}"
+    "KEY"    = "${var.stop_tag_name}"
+    "VALUE"  = "${var.stop_tag_value}"
   }
 }
-
-
-## Create policy for RDS stop
 
 data "aws_iam_policy_document" "lambda_stop_aurora_policy" {
   statement {
@@ -62,9 +40,9 @@ data "aws_iam_policy_document" "lambda_stop_aurora_policy" {
     ]
     condition {
       test     = "StringEquals"
-      variable = "aws:ResourceTag/${var.rds_tag_name}"
+      variable = "aws:ResourceTag/${var.stop_tag_name}"
       values = [
-        "${var.rds_tag_value}"
+        "${var.stop_tag_value}"
       ]
     }
   }
@@ -102,8 +80,6 @@ resource "aws_iam_role_policy_attachment" "lambda_stop_aurora_policy_basic" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
 }
 
-# create schedule
-
 resource "aws_lambda_permission" "lambda_stop_aurora_cloudwatch" {
   statement_id  = "lambda_stop_aurora_cloudwatch_permission"
   action        = "lambda:InvokeFunction"
@@ -115,7 +91,7 @@ resource "aws_lambda_permission" "lambda_stop_aurora_cloudwatch" {
 resource "aws_cloudwatch_event_rule" "lambda_stop_aurora" {
   description         = "Event to schedule daily shutdown of Aurora databases"
   name                = "stop_aurora"
-  schedule_expression = var.cron
+  schedule_expression = var.stop_cron
 }
 
 resource "aws_cloudwatch_event_target" "lambda_stop_aurora" {
