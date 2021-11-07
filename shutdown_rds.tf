@@ -6,7 +6,7 @@ data "archive_file" "lambda_stop_aurora" {
 
 module "lambda_stop_aurora" {
   source        = "github.com/schubergphilis/terraform-aws-mcaf-lambda?ref=v0.1.25"
-  name          = "lambda_stop_aurora"
+  name          = "lambda_stop_aurora-${random_string.random.id}"
   create_policy = false
   description   = "Stop list of aurora databases by tag"
   filename      = data.archive_file.lambda_stop_aurora.output_path
@@ -28,58 +28,6 @@ module "lambda_stop_aurora" {
   }
 }
 
-data "aws_iam_policy_document" "lambda_stop_aurora_policy" {
-  statement {
-    actions = [
-      "rds:StopDBCluster",
-      "rds:StopDBInstance",
-    ]
-
-    resources = [
-      "arn:aws:rds:*:*:cluster:*"
-    ]
-    condition {
-      test     = "StringEquals"
-      variable = "aws:ResourceTag/${var.stop_tag_name}"
-      values = [
-        "${var.stop_tag_value}"
-      ]
-    }
-  }
-
-  statement {
-    actions = [
-      "rds:DescribeDBClusters",
-      "rds:ListTagsForResource",
-    ]
-
-    resources = [
-      "arn:aws:rds:*:*:cluster:*"
-    ]
-  }
-}
-
-module "lambda_stop_aurora_role" {
-  source                = "github.com/schubergphilis/terraform-aws-mcaf-role?ref=v0.3.0"
-  name                  = "lambda_stop_aurora_role"
-  create_policy         = true
-  postfix               = false
-  principal_type        = "Service"
-  principal_identifiers = ["lambda.amazonaws.com"]
-  role_policy           = data.aws_iam_policy_document.lambda_stop_aurora_policy.json
-  tags                  = var.tags
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_stop_aurora_policy_vpcaccess" {
-  role       = module.lambda_stop_aurora_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_stop_aurora_policy_basic" {
-  role       = module.lambda_stop_aurora_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
 resource "aws_lambda_permission" "lambda_stop_aurora_cloudwatch" {
   statement_id  = "lambda_stop_aurora_cloudwatch_permission"
   action        = "lambda:InvokeFunction"
@@ -90,7 +38,7 @@ resource "aws_lambda_permission" "lambda_stop_aurora_cloudwatch" {
 
 resource "aws_cloudwatch_event_rule" "lambda_stop_aurora" {
   description         = "Event to schedule daily shutdown of Aurora databases"
-  name                = "stop_aurora"
+  name                = "stop_aurora-${random_string.random.id}"
   schedule_expression = var.stop_cron
 }
 

@@ -6,7 +6,7 @@ data "archive_file" "lambda_start_aurora" {
 
 module "lambda_start_aurora" {
   source        = "github.com/schubergphilis/terraform-aws-mcaf-lambda?ref=v0.1.25"
-  name          = "lambda_start_aurora"
+  name          = "lambda_start_aurora-${random_string.random.id}"
   create_policy = false
   description   = "Start list of aurora databases by tag"
   filename      = data.archive_file.lambda_start_aurora.output_path
@@ -28,58 +28,6 @@ module "lambda_start_aurora" {
   }
 }
 
-data "aws_iam_policy_document" "lambda_start_aurora_policy" {
-  statement {
-    actions = [
-      "rds:StartDBCluster",
-      "rds:StartDBInstance",
-    ]
-
-    resources = [
-      "arn:aws:rds:*:*:cluster:*"
-    ]
-    condition {
-      test     = "StringEquals"
-      variable = "aws:ResourceTag/${var.start_tag_name}"
-      values = [
-        "${var.start_tag_value}"
-      ]
-    }
-  }
-
-  statement {
-    actions = [
-      "rds:DescribeDBClusters",
-      "rds:ListTagsForResource",
-    ]
-
-    resources = [
-      "arn:aws:rds:*:*:cluster:*"
-    ]
-  }
-}
-
-module "lambda_start_aurora_role" {
-  source                = "github.com/schubergphilis/terraform-aws-mcaf-role?ref=v0.3.0"
-  name                  = "lambda_start_aurora_role"
-  create_policy         = true
-  postfix               = false
-  principal_type        = "Service"
-  principal_identifiers = ["lambda.amazonaws.com"]
-  role_policy           = data.aws_iam_policy_document.lambda_start_aurora_policy.json
-  tags                  = var.tags
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_start_aurora_policy_vpcaccess" {
-  role       = module.lambda_start_aurora_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole"
-}
-
-resource "aws_iam_role_policy_attachment" "lambda_start_aurora_policy_basic" {
-  role       = module.lambda_start_aurora_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-}
-
 resource "aws_lambda_permission" "lambda_start_aurora_cloudwatch" {
   statement_id  = "lambda_start_aurora_cloudwatch_permission"
   action        = "lambda:InvokeFunction"
@@ -90,7 +38,7 @@ resource "aws_lambda_permission" "lambda_start_aurora_cloudwatch" {
 
 resource "aws_cloudwatch_event_rule" "lambda_start_aurora" {
   description         = "Event to schedule daily start of Aurora databases"
-  name                = "start_aurora"
+  name                = "start_aurora-${random_string.random.id}"
   schedule_expression = var.start_cron
 }
 
