@@ -14,11 +14,9 @@ def shut_rds_all():
     region=os.environ['REGION']
     key=os.environ['KEY']
     value=os.environ['VALUE']
-
-    
     client = boto3.client('rds', region_name=region)
-    
     response=client.describe_db_clusters()
+    
     for i in response['DBClusters']:
         cluarn=i['DBClusterArn']
         resp2=client.list_tags_for_resource(ResourceName=cluarn)
